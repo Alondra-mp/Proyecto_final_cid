@@ -48,23 +48,21 @@ def four_point_transform(image, points):
 def detect_reference_object(image):
     """
     Detecta el contorno rectangular más grande asumiendo que es la hoja de referencia.
-    Usa cv2.cvtColor, cv2.GaussianBlur, cv2.Canny, cv2.findContours, cv2.approxPolyDP.
-    Retorna las 4 esquinas y el ratio px/cm.
-    Dimensiones hoja carta: 21.6 x 27.9 cm.
     """
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
     edged = cv2.Canny(blurred, 50, 150)
     
-    contours, _ = cv2.findContours(edged.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(edged.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
     
     if not contours:
         return None, None
         
-    contours = sorted(contours, key=cv2.contourArea, reverse=True)[:5]
+    contours = sorted(contours, key=cv2.contourArea, reverse=True)
     
     ref_contour = None
     for c in contours:
+        if cv2.contourArea(c) < 500: continue
         peri = cv2.arcLength(c, True)
         approx = cv2.approxPolyDP(c, 0.02 * peri, True)
         
@@ -78,16 +76,63 @@ def detect_reference_object(image):
     pts = ref_contour.reshape(4, 2)
     rect = order_points(pts)
     
-    # Calcular ancho y alto en píxeles del objeto de referencia
     (tl, tr, br, bl) = rect
     width_px = np.sqrt(((tr[0] - tl[0]) ** 2) + ((tr[1] - tl[1]) ** 2))
     height_px = np.sqrt(((tl[0] - bl[0]) ** 2) + ((tl[1] - bl[1]) ** 2))
-    
-    # Tomar la medida más grande como el largo (27.9 cm)
     max_px = max(width_px, height_px)
     px_per_cm = max_px / 27.9
     
     return ref_contour, px_per_cm
+
+def detect_target_and_reference(image):
+    """
+    Detecta los dos contornos rectangulares más grandes (área objetivo y hoja de referencia).
+    Usa cv2.RETR_LIST para encontrar hojas dentro de otras áreas.
+    Retorna: target_contour, ref_contour, px_per_cm
+    """
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+    edged = cv2.Canny(blurred, 50, 150)
+    
+    contours, _ = cv2.findContours(edged.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    
+    if not contours:
+        return None, None, None
+        
+    rects = []
+    contours = sorted(contours, key=cv2.contourArea, reverse=True)
+    
+    for c in contours:
+        if cv2.contourArea(c) < 1000:
+            continue
+            
+        peri = cv2.arcLength(c, True)
+        approx = cv2.approxPolyDP(c, 0.02 * peri, True)
+        
+        if len(approx) == 4:
+            if not rects or cv2.contourArea(rects[-1]) / cv2.contourArea(approx) > 1.2:
+                rects.append(approx)
+            if len(rects) == 2:
+                break
+                
+    if len(rects) == 0:
+        return None, None, None
+    elif len(rects) == 1:
+        target_contour = None
+        ref_contour = rects[0]
+    else:
+        target_contour = rects[0]
+        ref_contour = rects[1]
+        
+    pts = ref_contour.reshape(4, 2)
+    rect = order_points(pts)
+    (tl, tr, br, bl) = rect
+    width_px = np.sqrt(((tr[0] - tl[0]) ** 2) + ((tr[1] - tl[1]) ** 2))
+    height_px = np.sqrt(((tl[0] - bl[0]) ** 2) + ((tl[1] - bl[1]) ** 2))
+    max_px = max(width_px, height_px)
+    px_per_cm = max_px / 27.9
+    
+    return target_contour, ref_contour, px_per_cm
 
 def draw_panel_grid(image, area_dims, panel_dims, px_per_cm):
     """

@@ -7,7 +7,7 @@ import os
 
 # Añadir el directorio raíz al path para importar utils
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from utils.vision import detect_reference_object, four_point_transform, draw_panel_grid
+from utils.vision import detect_target_and_reference, four_point_transform, draw_panel_grid
 from utils.calculations import calculate_panels
 
 st.set_page_config(page_title="Azotea & Paneles", layout="wide")
@@ -42,45 +42,56 @@ if img_file_buffer is not None:
     col1, col2 = st.columns(2)
     
     with st.spinner("Procesando imagen..."):
-        # Detectar objeto de referencia (hoja de papel)
-        ref_contour, px_per_cm = detect_reference_object(cv_img)
+        target_contour, ref_contour, px_per_cm = detect_target_and_reference(cv_img)
         
         if ref_contour is None:
             st.warning("No se pudo detectar la hoja de referencia (tamaño carta). Por favor, asegúrate de que sea visible y esté bien iluminada.")
         else:
             st.success(f"¡Objeto de referencia detectado! Escala: {px_per_cm:.2f} px/cm")
             
-            st.markdown("### Selecciona las 4 esquinas de la azotea")
-            st.info("Ajusta los porcentajes para marcar las 4 esquinas del área útil.")
-            
-            c1, c2, c3, c4 = st.columns(4)
-            with c1:
-                tl_x = st.slider("Sup-Izq X %", 0, 100, 10)
-                tl_y = st.slider("Sup-Izq Y %", 0, 100, 10)
-            with c2:
-                tr_x = st.slider("Sup-Der X %", 0, 100, 90)
-                tr_y = st.slider("Sup-Der Y %", 0, 100, 10)
-            with c3:
-                br_x = st.slider("Inf-Der X %", 0, 100, 90)
-                br_y = st.slider("Inf-Der Y %", 0, 100, 90)
-            with c4:
-                bl_x = st.slider("Inf-Izq X %", 0, 100, 10)
-                bl_y = st.slider("Inf-Izq Y %", 0, 100, 90)
+            auto_detect = False
+            if target_contour is not None:
+                st.success("¡Área a medir detectada automáticamente!")
+                auto_detect = st.checkbox("Usar área detectada automáticamente", value=True)
                 
             h, w = cv_img.shape[:2]
-            pts = np.array([
-                [w * tl_x / 100, h * tl_y / 100],
-                [w * tr_x / 100, h * tr_y / 100],
-                [w * br_x / 100, h * br_y / 100],
-                [w * bl_x / 100, h * bl_y / 100]
-            ], dtype="float32")
             
+            if auto_detect and target_contour is not None:
+                pts = target_contour.reshape(4, 2).astype("float32")
+            else:
+                st.markdown("### Selecciona las 4 esquinas de la azotea")
+                st.info("Ajusta los porcentajes para marcar las 4 esquinas del área útil.")
+                
+                c1, c2, c3, c4 = st.columns(4)
+                with c1:
+                    tl_x = st.slider("Sup-Izq X %", 0, 100, 10)
+                    tl_y = st.slider("Sup-Izq Y %", 0, 100, 10)
+                with c2:
+                    tr_x = st.slider("Sup-Der X %", 0, 100, 90)
+                    tr_y = st.slider("Sup-Der Y %", 0, 100, 10)
+                with c3:
+                    br_x = st.slider("Inf-Der X %", 0, 100, 90)
+                    br_y = st.slider("Inf-Der Y %", 0, 100, 90)
+                with c4:
+                    bl_x = st.slider("Inf-Izq X %", 0, 100, 10)
+                    bl_y = st.slider("Inf-Izq Y %", 0, 100, 90)
+                    
+                pts = np.array([
+                    [w * tl_x / 100, h * tl_y / 100],
+                    [w * tr_x / 100, h * tr_y / 100],
+                    [w * br_x / 100, h * br_y / 100],
+                    [w * bl_x / 100, h * bl_y / 100]
+                ], dtype="float32")
+                
             # Dibujar contorno de referencia y puntos de la azotea
             img_with_pts = cv_img.copy()
             cv2.drawContours(img_with_pts, [ref_contour], -1, (0, 0, 255), 3)
             
-            for pt in pts:
-                cv2.circle(img_with_pts, (int(pt[0]), int(pt[1])), 10, (255, 0, 0), -1)
+            if auto_detect and target_contour is not None:
+                cv2.drawContours(img_with_pts, [target_contour], -1, (0, 255, 0), 3)
+            else:
+                for pt in pts:
+                    cv2.circle(img_with_pts, (int(pt[0]), int(pt[1])), 10, (255, 0, 0), -1)
                 
             with col1:
                 st.subheader("Imagen Original con Puntos")
@@ -112,6 +123,13 @@ if img_file_buffer is not None:
                         (panel_w_cm + spacing_cm, panel_h_cm + spacing_cm), 
                         px_per_cm
                     )
+                    
+                    # Dibujar medidas en la imagen original
+                    cv2.putText(img_with_pts, f"{roof_w_cm/100:.2f}m x {roof_h_cm/100:.2f}m", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
+                    
+                    # Dibujar medidas en la imagen corregida
+                    cv2.putText(annotated_roof, f"W: {roof_w_cm/100:.2f}m", (int(roof_w_px/2)-50, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
+                    cv2.putText(annotated_roof, f"H: {roof_h_cm/100:.2f}m", (10, int(roof_h_px/2)), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
                     
                     with col2:
                         st.subheader("Perspectiva Corregida y Paneles")
