@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\alond\\\\OneDrive\\\\Documentos\\\\GitHub\\\\Proyecto_final_cid\" -Recurse -Force | Select-Object FullName | ForEach-Object { $_.FullName } | Sort-Object)"
+    ]
+  }
+}
