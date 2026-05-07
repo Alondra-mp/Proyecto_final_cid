@@ -10,9 +10,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils.vision import detect_reference_object, four_point_transform, draw_panel_grid
 from utils.calculations import calculate_panels
 
-st.set_page_config(page_title="Azotea & Paneles", page_icon="🏠", layout="wide")
+st.set_page_config(page_title="Azotea & Paneles", layout="wide")
 
-st.title("🏠 Medición de Azotea para Paneles Solares")
+st.title("Medición de Azotea para Paneles Solares")
 
 # Sidebar para inputs
 st.sidebar.header("Parámetros del Panel")
@@ -26,6 +26,7 @@ img_file_buffer = None
 if source_option == "Subir archivo":
     img_file_buffer = st.file_uploader("Sube una imagen de tu azotea", type=["jpg", "jpeg", "png"])
 else:
+    st.info("Asegúrate de permitir el acceso a la cámara en tu navegador cuando se te solicite.")
     img_file_buffer = st.camera_input("Toma una foto de tu azotea")
 
 if img_file_buffer is not None:

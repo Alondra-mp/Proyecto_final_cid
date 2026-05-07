@@ -10,9 +10,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from utils.vision import detect_reference_object, four_point_transform
 from utils.calculations import calculate_ac_tonnage
 
-st.set_page_config(page_title="Cuarto & AC", page_icon="❄️", layout="wide")
+st.set_page_config(page_title="Cuarto & AC", layout="wide")
 
-st.title("❄️ Medición de Cuarto para Aire Acondicionado")
+st.title("Medición de Cuarto para Aire Acondicionado")
 
 st.sidebar.header("Parámetros de la Habitación")
 height_m = st.sidebar.slider("Altura del techo (m)", min_value=2.0, max_value=4.0, value=2.4, step=0.1)
@@ -25,6 +25,7 @@ img_file_buffer = None
 if source_option == "Subir archivo":
     img_file_buffer = st.file_uploader("Sube una imagen del piso de tu cuarto", type=["jpg", "jpeg", "png"])
 else:
+    st.info("Asegúrate de permitir el acceso a la cámara en tu navegador cuando se te solicite.")
     img_file_buffer = st.camera_input("Toma una foto del piso de tu cuarto")
 
 if img_file_buffer is not None:
@@ -107,7 +108,7 @@ if img_file_buffer is not None:
                     m2.metric("BTUs Requeridos", f"{int(btus):,}")
                     m3.metric("Toneladas Calculadas", f"{tonnage:.2f}")
                     
-                    st.info(f"💡 **Sugerencia de Equipo:** Te recomendamos instalar un equipo de **{suggested_tonnage} Toneladas**.")
+                    st.info(f"Sugerencia de Equipo: Te recomendamos instalar un equipo de **{suggested_tonnage} Toneladas**.")
                     
                     st.write(f"**Dimensiones corregidas:** {room_w_m:.2f}m x {room_h_m:.2f}m")
             except Exception as e:
